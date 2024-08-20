@@ -223,3 +223,5 @@ plt.ylabel('Count')
 plt.title('Goals and Misses Over Time (Phase 3)')
 plt.legend()
 plt.show()
+
+torch.save(agent_phase3.model.state_dict(), 'shooter_phase3_model.pth')
