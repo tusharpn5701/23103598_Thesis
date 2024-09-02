@@ -7,7 +7,7 @@ from collections import deque
 import matplotlib.pyplot as plt
 import torch_optimizer as optim_optim
 class SoccerEnvGoalkeeper:
-    def __init__(self, goal_width=3.32, goal_height=1.44):
+    def __init__(self, goal_width=7.32, goal_height=2.44):
         self.goal_width = goal_width
         self.goal_height = goal_height
         self.state = self.reset()
