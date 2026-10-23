@@ -1,0 +1,1019 @@
+<title>Penalty Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a touchline analysis board. Live simulator first, then the agents' minds, training, results, code. */
+:root {
+  --bg: #f1f4ee;
+  --surface: #fbfcfa;
+  --surface-2: #e8ede5;
+  --ink: #111a14;
+  --ink-2: #48554d;
+  --ink-3: #6f7b74;
+  --line: #d5ddd3;
+  --turf: #2c6a3d;
+  --turf-2: #33764a;
+  --chalk: #f3f7f1;
+  --grass-ink: #2b7a45;
+  --card: #f5c518;
+  --card-ink: #1d1a05;
+  --dqn: #0090a3;
+  --ddpg: #7048e8;
+  --goal: #e03131;
+  --saved: #1971c2;
+  --missed: #868e96;
+  --net-bg: #e6ece4;
+  --net-line: #c5cfc3;
+  --font-display: "Big Shoulders Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1411; --surface: #151d18; --surface-2: #1b251f; --ink: #e7eee9; --ink-2: #a8b4ad; --ink-3: #7d8a83;
+    --line: #2a362f; --turf: #1d4a2a; --turf-2: #22532f; --chalk: #dce7df; --grass-ink: #6cc18a; --card: #f5c518; --card-ink: #1d1a05;
+    --dqn: #1098ad; --ddpg: #9775fa; --goal: #f03e3e; --saved: #339af0; --missed: #7c8a84;
+    --net-bg: #18221c; --net-line: #2c3a31; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1411; --surface: #151d18; --surface-2: #1b251f; --ink: #e7eee9; --ink-2: #a8b4ad; --ink-3: #7d8a83;
+  --line: #2a362f; --turf: #1d4a2a; --turf-2: #22532f; --chalk: #dce7df; --grass-ink: #6cc18a; --card: #f5c518; --card-ink: #1d1a05;
+  --dqn: #1098ad; --ddpg: #9775fa; --goal: #f03e3e; --saved: #339af0; --missed: #7c8a84;
+  --net-bg: #18221c; --net-line: #2c3a31; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.02; letter-spacing: 0.01em; }
+h2 { font-size: clamp(30px, 4.2vw, 46px); font-weight: 800; text-transform: uppercase; }
+h3 { font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+p { margin: 0; }
+a { color: inherit; text-underline-offset: 3px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+.lede { color: var(--ink-2); max-width: 64ch; font-size: 16px; }
+.mono { font-family: var(--font-mono); }
+.num { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--card); outline-offset: 2px; }
+
+/* header */
+header.top { border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; padding-block: 14px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand b { font-family: var(--font-display); font-size: 26px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.03em; }
+nav.sections { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 14px; }
+nav.sections a { text-decoration: none; color: var(--ink-2); }
+nav.sections a:hover { color: var(--ink); text-decoration: underline; }
+
+.intro { padding-block: 32px 18px; display: grid; gap: 14px; }
+.intro h1 { font-size: clamp(36px, 5.6vw, 68px); font-weight: 900; text-transform: uppercase; max-width: 22ch; }
+.intro h1 .q { color: var(--dqn); } .intro h1 .d { color: var(--ddpg); }
+.byline { font-size: 14px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 4px 18px; }
+
+section { padding-block: 44px; border-top: 1px solid var(--line); }
+section > .wrap { display: grid; gap: 22px; }
+.section-head { display: grid; gap: 10px; }
+
+/* simulator */
+#sim { border-top: none; padding-top: 8px; }
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 14px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; min-width: 0; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+.panel-head strong { font-family: var(--font-display); font-size: 17px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink); }
+canvas { display: block; width: 100%; touch-action: none; }
+.pitch-panel { display: flex; flex-direction: column; }
+#pitch { flex: 1 1 auto; min-height: 320px; cursor: crosshair; }
+#goalview { aspect-ratio: 2.5 / 1; }
+#goalview.aiming { cursor: crosshair; }
+.goal-col { display: grid; gap: 14px; align-content: start; min-width: 0; }
+
+.controls { display: grid; grid-template-columns: 1.35fr 1.35fr 1fr 1fr; gap: 12px 18px; padding: 14px; }
+@media (max-width: 1060px) { .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .controls { grid-template-columns: minmax(0, 1fr); } }
+.ctl { display: grid; gap: 6px; min-width: 0; }
+.ctl > span { font-size: 12px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+.seg { display: flex; flex-wrap: nowrap; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+.seg button { flex: 1 1 auto; border: 0; background: transparent; color: var(--ink-2); font: 500 14px var(--font-body); padding: 7px 8px; white-space: nowrap; cursor: pointer; border-right: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button:hover:not([aria-pressed="true"]) { color: var(--ink); background: var(--surface); }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 0 14px 14px; }
+.btn { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 14px var(--font-body); padding: 9px 16px; border-radius: 8px; cursor: pointer; }
+.btn:hover { border-color: var(--ink-3); }
+.btn.primary { background: var(--card); color: var(--card-ink); border-color: var(--card); font-family: var(--font-display); font-size: 19px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 22px; }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink-2); cursor: pointer; }
+label.check input { accent-color: var(--grass-ink); }
+
+.board { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.board > div { padding: 10px 14px; border-right: 1px solid var(--line); display: grid; gap: 2px; }
+.board > div:last-child { border-right: 0; }
+.board .k { font-size: 12px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+.board .v { font-family: var(--font-display); font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.readout { padding: 12px 14px; font-size: 14px; color: var(--ink-2); border-top: 1px solid var(--line); display: grid; gap: 4px; min-height: 76px; }
+.readout .verdict { font-family: var(--font-display); font-size: 24px; font-weight: 800; text-transform: uppercase; color: var(--ink); letter-spacing: 0.03em; }
+.verdict.goal { color: var(--goal); } .verdict.saved { color: var(--saved); } .verdict.missed { color: var(--ink-3); }
+.ref { font-size: 13px; color: var(--ink-3); padding: 0 14px 12px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-2); padding: 8px 12px; border-top: 1px solid var(--line); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.ramp { width: 90px; height: 9px; border-radius: 2px; display: inline-block; }
+
+/* rules */
+.rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.rule { padding: 16px; display: grid; gap: 6px; align-content: start; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; min-width: 0; }
+.rule .f { font-family: var(--font-mono); font-size: 13px; background: var(--surface-2); padding: 6px 8px; border-radius: 6px; overflow-wrap: anywhere; }
+.rule p { font-size: 14px; color: var(--ink-2); }
+
+/* aim map */
+.mapbar { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: end; }
+#aimmap { aspect-ratio: 1.3 / 1; }
+.two { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.note { font-size: 14px; color: var(--ink-2); display: grid; gap: 10px; }
+.note p { max-width: 60ch; }
+
+/* charts */
+.charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+.chart { position: relative; padding: 4px 8px 8px; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink-3); font: 11px var(--font-mono); }
+.chart .lbl { fill: var(--ink-2); font: 500 12px var(--font-body); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); display: none; font-variant-numeric: tabular-nums; z-index: 2; }
+.tip b { font-weight: 600; }
+.tip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+
+/* tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+th { font-family: var(--font-mono); font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); background: var(--surface-2); white-space: nowrap; }
+td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cellbar { display: grid; gap: 4px; min-width: 120px; }
+.cellbar .bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+.cellbar .bar i { display: block; height: 100%; }
+.cellbar .t { font-variant-numeric: tabular-nums; font-size: 14px; }
+.cellbar .t b { font-size: 16px; }
+.cellbar .t small { color: var(--ink-3); font-size: 12px; }
+.hl { background: color-mix(in srgb, var(--card) 14%, transparent); }
+.findings { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.finding { display: grid; gap: 6px; align-content: start; padding-top: 10px; border-top: 3px solid var(--ink); }
+.finding b { font-family: var(--font-display); font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
+.finding p { font-size: 14px; color: var(--ink-2); }
+
+/* code */
+.code { display: grid; grid-template-columns: 240px minmax(0, 1fr); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+.files { border-right: 1px solid var(--line); padding: 10px 0; display: grid; align-content: start; gap: 2px; background: var(--surface-2); }
+.files .grp { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 10px 14px 4px; }
+.files button { text-align: left; border: 0; background: transparent; font: 13px var(--font-mono); color: var(--ink-2); padding: 5px 14px; cursor: pointer; border-left: 3px solid transparent; }
+.files button:hover { color: var(--ink); }
+.files button[aria-pressed="true"] { color: var(--ink); background: var(--surface); border-left-color: var(--grass-ink); font-weight: 500; }
+.viewer { min-width: 0; display: grid; grid-template-rows: auto 1fr; }
+.viewer-head { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--ink-2); }
+.viewer pre { margin: 0; padding: 14px 16px; overflow: auto; max-height: 620px; font: 13px/1.6 var(--font-mono); tab-size: 4; }
+.hljs-keyword, .hljs-built_in { color: var(--ddpg); }
+.hljs-string { color: var(--grass-ink); }
+.hljs-comment { color: var(--ink-3); font-style: italic; }
+.hljs-number, .hljs-literal { color: var(--dqn); }
+.hljs-title, .hljs-title.function_, .hljs-title.class_ { color: var(--goal); }
+.hljs-meta { color: var(--ink-3); }
+.changes { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.change { padding: 14px 16px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 0 -1px -1px 0; display: grid; gap: 4px; align-content: start; }
+.change b { font-weight: 600; }
+.change p { font-size: 14px; color: var(--ink-2); }
+.change .where { font-family: var(--font-mono); font-size: 12px; color: var(--ink-3); }
+.run { font-family: var(--font-mono); font-size: 13px; background: var(--ink); color: var(--bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; white-space: pre; }
+
+footer { border-top: 1px solid var(--line); padding-block: 26px 40px; font-size: 13px; color: var(--ink-3); }
+footer .wrap { display: grid; gap: 6px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+@media (max-width: 860px) {
+  .stage, .two { grid-template-columns: minmax(0, 1fr); }
+  #pitch { flex: none; aspect-ratio: 1.45 / 1; min-height: 0; }
+  .code { grid-template-columns: minmax(0, 1fr); }
+  .files { border-right: 0; border-bottom: 1px solid var(--line); grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .files .grp { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .board > div:nth-child(2) { border-right: 0; }
+  .board > div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .board .v { font-size: 32px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><b>Penalty Lab</b><span class="eyebrow">MSc AI thesis · University of Galway</span></div>
+    <nav class="sections" aria-label="Sections">
+      <a href="#sim">Simulator</a><a href="#rules">Rules</a><a href="#minds">Aim map</a><a href="#training">Training</a><a href="#results">Results</a><a href="#code">Code</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap intro">
+  <span class="eyebrow">A comparative analysis of reinforcement learning approaches for attacker and goalkeeper agents in simulated soccer</span>
+  <h1><span class="q">Deep Q-Networks</span> vs <span class="d">DDPG</span> from the penalty spot</h1>
+  <p class="lede">Two attackers and two goalkeepers, one of each trained with a Deep Q-Network and one with Deep Deterministic Policy Gradient. Pick a shooter and a keeper and watch them play. The networks run live in your browser with the trained weights. You can also take the shot yourself.</p>
+  <div class="byline"><span>Tushar Purushothaman Namboodiri</span><span>Supervisor: Dr. Enda Howley</span><span>Submitted August 2024</span><a href="https://github.com/tusharpn5701/23103598_Thesis" target="_blank" rel="noopener">Code on GitHub</a></div>
+</div>
+
+<section id="sim">
+  <div class="wrap">
+    <div class="stage">
+      <div class="panel pitch-panel">
+        <div class="panel-head"><strong>Pitch</strong><span id="pitchHint">Click or drag inside the box to place the shooter</span></div>
+        <canvas id="pitch" aria-label="Top-down view of the penalty area. Click to place the shooter."></canvas>
+        <div class="legend">
+          <span><i class="dot" style="background:var(--goal)"></i>Goal</span>
+          <span><i class="dot" style="border:2px solid var(--saved)"></i>Saved</span>
+          <span><span class="mono" style="color:var(--missed);font-weight:600">×</span>Missed</span>
+          <span><i class="dot" style="background:var(--card)"></i>Shooter</span>
+        </div>
+      </div>
+      <div class="goal-col">
+        <div class="panel">
+          <div class="panel-head"><strong>Goal view</strong><span id="goalHint">Ball arrival point and keeper dive</span></div>
+          <canvas id="goalview" aria-label="Front view of the goal showing where the ball arrives and where the keeper dives."></canvas>
+          <div class="legend">
+            <label class="check"><input type="checkbox" id="showQ" checked> Attacker's estimated scoring chance</label>
+            <label class="check"><input type="checkbox" id="showReach" checked> Keeper's reach</label>
+            <span id="qLegend"><span class="ramp" id="rampSwatch"></span><span class="mono" style="font-size:12px">0% → 100%</span></span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="board" aria-live="polite">
+            <div><span class="k"><i class="dot" style="background:var(--goal)"></i>Goals</span><span class="v" id="sGoal">0</span></div>
+            <div><span class="k"><i class="dot" style="border:2px solid var(--saved)"></i>Saved</span><span class="v" id="sSaved">0</span></div>
+            <div><span class="k">× Missed</span><span class="v" id="sMissed">0</span></div>
+            <div><span class="k">Scored</span><span class="v" id="sRate">–</span></div>
+          </div>
+          <div class="readout" id="readout" aria-live="polite"></div>
+          <p class="ref" id="refline"></p>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="controls">
+        <div class="ctl"><span>Attacker</span>
+          <div class="seg" id="segAtt" role="group" aria-label="Attacker">
+            <button data-v="DQN"><i class="dot" style="background:var(--dqn)"></i>DQN</button>
+            <button data-v="DDPG"><i class="dot" style="background:var(--ddpg)"></i>DDPG</button>
+            <button data-v="Simplistic">Random</button>
+            <button data-v="You">You</button>
+          </div></div>
+        <div class="ctl"><span>Goalkeeper</span>
+          <div class="seg" id="segKeep" role="group" aria-label="Goalkeeper">
+            <button data-v="DQN"><i class="dot" style="background:var(--dqn)"></i>DQN</button>
+            <button data-v="DDPG"><i class="dot" style="background:var(--ddpg)"></i>DDPG</button>
+            <button data-v="Heuristic">Scripted</button>
+            <button data-v="Empty goal">None</button>
+          </div></div>
+        <div class="ctl"><span>Shooter position</span>
+          <div class="seg" id="segPos" role="group" aria-label="Shooter position">
+            <button data-v="random">New spot</button>
+            <button data-v="fixed">Fixed spot</button>
+          </div></div>
+        <div class="ctl"><span>Replay speed</span>
+          <div class="seg" id="segSpeed" role="group" aria-label="Replay speed">
+            <button data-v="0.35">Slow-mo</button>
+            <button data-v="1">Normal</button>
+            <button data-v="3">Fast</button>
+          </div></div>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btnShoot">Take shot</button>
+        <button class="btn" id="btnRun">Run 100 shots</button>
+        <button class="btn" id="btnClear">Clear</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The environment</span>
+      <h2>Rules of the penalty box</h2>
+      <p class="lede">Every shot is one decision. The attacker sees where it stands and picks an aim point on the goal. The keeper sees a noisy read of the shot and picks where to dive. Physics decides the rest. These are the same rules the agents trained under.</p>
+    </div>
+    <div class="rules" id="rulesGrid"></div>
+  </div>
+</section>
+
+<section id="minds">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Inside the networks</span>
+      <h2>Aim map</h2>
+      <p class="lede">Each small goal is a shooting spot in the box. The dot shows where the attacker's network aims from that spot. The shading behind it is the scoring rate from that spot against the chosen keeper, simulated in your browser.</p>
+    </div>
+    <div class="mapbar">
+      <div class="ctl"><span>Attacker</span>
+        <div class="seg" id="segMapAtt" role="group" aria-label="Aim map attacker">
+          <button data-v="DQN"><i class="dot" style="background:var(--dqn)"></i>DQN</button>
+          <button data-v="DDPG"><i class="dot" style="background:var(--ddpg)"></i>DDPG</button>
+        </div></div>
+      <div class="ctl"><span>Against</span>
+        <div class="seg" id="segMapKeep" role="group" aria-label="Aim map keeper">
+          <button data-v="Heuristic">Scripted keeper</button>
+          <button data-v="DQN">DQN keeper</button>
+          <button data-v="DDPG">DDPG keeper</button>
+        </div></div>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <canvas id="aimmap" aria-label="Grid of shooting positions showing each attacker's aim point and scoring rate."></canvas>
+        <div class="legend">
+          <span><span class="ramp" id="rampSwatch2"></span><span class="mono" style="font-size:12px">scoring rate 0% → 100%</span></span>
+          <span id="mapSummary"></span>
+        </div>
+      </div>
+      <div class="note" id="mapNote"></div>
+    </div>
+  </div>
+</section>
+
+<section id="training">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Learning curves</span>
+      <h2>Training</h2>
+      <p class="lede" id="trainLede"></p>
+    </div>
+    <div class="charts">
+      <div class="panel"><div class="panel-head"><strong>Attackers</strong><span>Goals per 10 shots vs the scripted keeper</span></div><div class="chart" id="chartAtt"></div></div>
+      <div class="panel"><div class="panel-head"><strong>Goalkeepers</strong><span>Saves per 10 shots vs random-aim attacker</span></div><div class="chart" id="chartKeep"></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Evaluation</span>
+      <h2>Results</h2>
+      <p class="lede" id="resLede"></p>
+    </div>
+    <div class="table-wrap"><table id="matrix"></table></div>
+    <div class="findings" id="findings"></div>
+    <h3>Thesis and v2 side by side</h3>
+    <p class="lede">The thesis column reports the figures published in the thesis. The v2 column reruns the same three questions with the revised code in this repository. The two columns measure different environments, so read them as two experiments rather than a before-and-after score.</p>
+    <div class="table-wrap"><table id="compare"></table></div>
+  </div>
+</section>
+
+<section id="code">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Source</span>
+      <h2>Code</h2>
+      <p class="lede">The v2 folder is a cleaned-up, runnable version of the thesis code. The original files are kept unchanged for reference. Everything on this page comes from <span class="mono">v2/</span>: train the agents, evaluate them, then export the weights the simulator uses.</p>
+    </div>
+    <div class="run">pip install -r v2/requirements.txt
+cd v2
+python train.py          # trains all four agents (about 10 minutes on a laptop CPU)
+python evaluate.py       # head-to-head matrix, figures/ and results/results.json
+python export_web.py     # weights + curves for this page</div>
+    <h3>What changed in v2</h3>
+    <div class="changes" id="changes"></div>
+    <div class="code">
+      <div class="files" id="fileList"></div>
+      <div class="viewer">
+        <div class="viewer-head"><span class="mono" id="fileName"></span><span id="fileMeta"></span></div>
+        <pre><code id="codeView" class="language-python"></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Penalty Lab accompanies the MSc thesis "A Comparative Analysis of Reinforcement Learning Approaches for Attacker and Goalkeeper Agents in Simulated Soccer", School of Computer Science, University of Galway, 2024.</p>
+    <p>Simulator, aim map and per-spot rates run in the browser with the exported network weights. Tables and curves come from <span class="mono">v2/evaluate.py</span> and <span class="mono">v2/train.py</span>.</p>
+  </div>
+</footer>
+
+<div class="sr" aria-live="polite" id="srStatus"></div>
+
+<script id="data" type="application/json">__DATA__</script>
+<script id="sources" type="application/json">__SOURCES__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const SOURCES = JSON.parse(document.getElementById("sources").textContent);
+const P = DATA.params;
+const W = P.goal_w, H = P.goal_h;
+const KS = P.keeper_start;
+const GOAL = 0, SAVED = 1, MISSED = 2;
+
+/* ------------------------------------------------------------------ helpers */
+const $ = (s) => document.querySelector(s);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+const fmt = (x, d = 1) => Number(x).toFixed(d);
+function gauss() { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function hexA(hex, a) { const h = hex.replace("#", ""); const n = parseInt(h.length === 3 ? h.split("").map(c => c + c).join("") : h, 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+
+/* ------------------------------------------------------------------ environment (mirrors v2/soccer_env.py) */
+const Env = {
+  range(lat, dist) { return Math.hypot(lat, dist); },
+  noise(lat, dist) { const r = Math.hypot(lat, dist); const s = P.shot_noise_base + P.shot_noise_per_m * r; return [s / (dist / r), s]; },
+  flight(lat, dist) { return Math.hypot(lat, dist) / P.ball_speed; },
+  reach(lat, dist) { return Math.max(0, this.flight(lat, dist) - P.keeper_reaction) * P.keeper_speed; },
+  sample() { return [P.lat_range[0] + Math.random() * (P.lat_range[1] - P.lat_range[0]), P.dist_range[0] + Math.random() * (P.dist_range[1] - P.dist_range[0])]; },
+  shoot(aim, lat, dist) { const [su, sv] = this.noise(lat, dist); return [aim[0] + gauss() * su, Math.max(0, aim[1] + gauss() * sv)]; },
+  read(ball) { return [ball[0] + gauss() * P.keeper_read_noise, ball[1] + gauss() * P.keeper_read_noise]; },
+  keeperFinal(target, lat, dist) {
+    const t = [clamp(target[0], 0, W), clamp(target[1], 0, H)];
+    let mx = t[0] - KS[0], my = t[1] - KS[1]; const n = Math.hypot(mx, my); const r = this.reach(lat, dist);
+    if (n > r) { mx *= r / (n + 1e-9); my *= r / (n + 1e-9); }
+    return [KS[0] + mx, KS[1] + my];
+  },
+  onTarget(b) { return b[0] >= 0 && b[0] <= W && b[1] >= 0 && b[1] <= H; },
+  resolve(ball, target, lat, dist) {
+    if (target === null) return { outcome: this.onTarget(ball) ? GOAL : MISSED, gk: null };
+    const gk = this.keeperFinal(target, lat, dist);
+    if (!this.onTarget(ball)) return { outcome: MISSED, gk };
+    if (Math.hypot(gk[0] - ball[0], gk[1] - ball[1]) < P.save_radius) return { outcome: SAVED, gk };
+    return { outcome: GOAL, gk };
+  },
+};
+function attObs(lat, dist) { const [lo, hi] = P.dist_range; return [lat / 10, (dist - (lo + hi) / 2) / ((hi - lo) / 2)]; }
+function keepObs(read, lat, dist) { const a = attObs(lat, dist); return [read[0] / W * 2 - 1, read[1] / H * 2 - 1, a[0], a[1]]; }
+
+/* ------------------------------------------------------------------ neural nets: plain forward passes */
+function mlp(layers, x, outTanh) {
+  let h = x;
+  for (let li = 0; li < layers.length; li++) {
+    const [Wm, b] = layers[li]; const out = new Array(b.length);
+    for (let i = 0; i < b.length; i++) { let s = b[i]; const row = Wm[i]; for (let j = 0; j < h.length; j++) s += row[j] * h[j]; out[i] = s; }
+    const last = li === layers.length - 1;
+    for (let i = 0; i < out.length; i++) out[i] = last ? (outTanh ? Math.tanh(out[i]) : out[i]) : Math.max(0, out[i]);
+    h = out;
+  }
+  return h;
+}
+const argmax = (a) => a.reduce((bi, v, i) => (v > a[bi] ? i : bi), 0);
+const N = DATA.nets;
+const ddpgScale = (net, a) => a.map((v, i) => net.low[i] + (v + 1) * 0.5 * (net.high[i] - net.low[i]));
+const ddpgUnscale = (net, a) => a.map((v, i) => (v - net.low[i]) / (net.high[i] - net.low[i]) * 2 - 1);
+
+const Attackers = {
+  DQN: (lat, dist) => N.attacker_dqn.grid[argmax(mlp(N.attacker_dqn.layers, attObs(lat, dist)))],
+  DDPG: (lat, dist) => ddpgScale(N.attacker_ddpg, mlp(N.attacker_ddpg.actor, attObs(lat, dist), true)),
+  Simplistic: () => [Math.random() * W, Math.random() * H],
+};
+const Keepers = {
+  DQN: (read, lat, dist) => N.keeper_dqn.grid[argmax(mlp(N.keeper_dqn.layers, keepObs(read, lat, dist)))],
+  DDPG: (read, lat, dist) => ddpgScale(N.keeper_ddpg, mlp(N.keeper_ddpg.actor, keepObs(read, lat, dist), true)),
+  Heuristic: (read) => [clamp(read[0], 0, W), clamp(read[1], 0, H)],
+  "Empty goal": null,
+};
+/* value estimate -> scoring chance. Attacker reward is +10 goal / -10 otherwise, so Q = 20 p - 10. */
+function scoringChanceGrid(algo, lat, dist) {
+  const s = attObs(lat, dist);
+  if (algo === "DQN") {
+    const q = mlp(N.attacker_dqn.layers, s);
+    return { kind: "cells", grid: N.attacker_dqn.grid, p: q.map(v => clamp((v + 10) / 20, 0, 1)) };
+  }
+  if (algo === "DDPG") {
+    const nu = 44, nv = 15, pts = [], p = [];
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+      const u = -0.5 + (W + 1) * (i + 0.5) / nu, v = (H + 0.3) * (j + 0.5) / nv;
+      pts.push([u, v]);
+      const a = ddpgUnscale(N.attacker_ddpg, [u, v]);
+      p.push(clamp((mlp(N.attacker_ddpg.critic, [...s, ...a])[0] + 10) / 20, 0, 1));
+    }
+    return { kind: "fine", nu, nv, du: (W + 1) / nu, dv: (H + 0.3) / nv, pts, p };
+  }
+  return null;
+}
+
+/* parity check against PyTorch outputs exported with the weights */
+(function parity() {
+  let worst = 0;
+  for (const t of DATA.tests) {
+    const a = t.role === "attacker" ? [Attackers.DQN(t.lat, t.dist), Attackers.DDPG(t.lat, t.dist)]
+      : [Keepers.DQN(t.read, t.lat, t.dist), Keepers.DDPG(t.read, t.lat, t.dist)];
+    worst = Math.max(worst, Math.abs(a[0][0] - t.dqn[0]), Math.abs(a[0][1] - t.dqn[1]), Math.abs(a[1][0] - t.ddpg[0]), Math.abs(a[1][1] - t.ddpg[1]));
+  }
+  window.__parity = worst;
+  if (worst > 1e-3) console.warn("JS forward pass differs from PyTorch by", worst);
+})();
+
+/* ------------------------------------------------------------------ canvas setup */
+function setupCanvas(cv) {
+  const r = cv.getBoundingClientRect(); const d = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext("2d"); ctx.setTransform(d, 0, 0, d, 0, 0);
+  return { ctx, w: r.width, h: r.height };
+}
+
+/* Pitch view: goal along the top. World x = lateral (m), y = distance from goal line (m). */
+const PITCH_VIEW = { x0: -16.5, x1: 16.5, y0: -2.2, y1: 19.1 };
+function pitchXf(w, h, V = PITCH_VIEW) {
+  const vw = V.x1 - V.x0, vh = V.y1 - V.y0;
+  const s = Math.min(w / vw, h / vh); const ox = (w - vw * s) / 2, oy = (h - vh * s) / 2;
+  return { s, X: (x) => ox + (x - V.x0) * s, Y: (y) => oy + (y - V.y0) * s, inv: (px, py) => [(px - ox) / s + V.x0, (py - oy) / s + V.y0] };
+}
+function drawPitchBase(ctx, w, h, T) {
+  ctx.fillStyle = css("--turf"); ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = css("--turf-2");
+  for (let k = 0; k < 12; k++) { if (k % 2) continue; const y0 = T.Y(k * 2 - 2.2), y1 = T.Y(k * 2); ctx.fillRect(0, y0, w, y1 - y0); }
+  const chalk = css("--chalk"); ctx.strokeStyle = hexA(chalk, 0.9); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0, T.Y(0)); ctx.lineTo(w, T.Y(0)); ctx.stroke();
+  ctx.strokeRect(T.X(-20.16), T.Y(0), T.X(20.16) - T.X(-20.16), T.Y(16.5) - T.Y(0));
+  ctx.strokeRect(T.X(-9.16), T.Y(0), T.X(9.16) - T.X(-9.16), T.Y(5.5) - T.Y(0));
+  ctx.beginPath(); ctx.arc(T.X(0), T.Y(11), 9.15 * T.s, Math.asin(5.5 / 9.15), Math.PI - Math.asin(5.5 / 9.15)); ctx.stroke();
+  ctx.fillStyle = chalk; ctx.beginPath(); ctx.arc(T.X(0), T.Y(11), 2.5, 0, 7); ctx.fill();
+  // shooting zone
+  ctx.fillStyle = hexA(chalk, 0.07); ctx.setLineDash([5, 5]); ctx.strokeStyle = hexA(chalk, 0.45); ctx.lineWidth = 1;
+  const zx = T.X(P.lat_range[0]), zy = T.Y(P.dist_range[0]);
+  ctx.fillRect(zx, zy, T.X(P.lat_range[1]) - zx, T.Y(P.dist_range[1]) - zy);
+  ctx.strokeRect(zx, zy, T.X(P.lat_range[1]) - zx, T.Y(P.dist_range[1]) - zy); ctx.setLineDash([]);
+  // goal frame + net depth
+  ctx.fillStyle = hexA(chalk, 0.18); ctx.fillRect(T.X(-W / 2), T.Y(-1.6), W * T.s, 1.6 * T.s);
+  ctx.strokeStyle = chalk; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(T.X(-W / 2), T.Y(0)); ctx.lineTo(T.X(W / 2), T.Y(0)); ctx.stroke();
+}
+
+/* Goal view: front-on, ground at the bottom. World u along the goal, v height. */
+const GOAL_VIEW = { u0: -1.35, u1: W + 1.35, v0: -0.35, v1: H + 0.75 };
+function goalXf(w, h) {
+  const vw = GOAL_VIEW.u1 - GOAL_VIEW.u0, vh = GOAL_VIEW.v1 - GOAL_VIEW.v0;
+  const s = Math.min(w / vw, h / vh); const ox = (w - vw * s) / 2, oy = (h - vh * s) / 2;
+  return { s, X: (u) => ox + (u - GOAL_VIEW.u0) * s, Y: (v) => oy + (GOAL_VIEW.v1 - v) * s, inv: (px, py) => [(px - ox) / s + GOAL_VIEW.u0, GOAL_VIEW.v1 - (py - oy) / s] };
+}
+function drawGoalBase(ctx, w, h, T) {
+  ctx.fillStyle = css("--net-bg"); ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = css("--turf"); ctx.fillRect(0, T.Y(0), w, h - T.Y(0));
+  ctx.fillStyle = css("--turf-2"); for (let k = -2; k < 12; k += 2) ctx.fillRect(T.X(k), T.Y(0), 1 * T.s, h - T.Y(0));
+  ctx.strokeStyle = css("--net-line"); ctx.lineWidth = 1;
+  for (let u = 0; u <= W + 1e-6; u += 0.305) { ctx.beginPath(); ctx.moveTo(T.X(u), T.Y(0)); ctx.lineTo(T.X(u), T.Y(H)); ctx.stroke(); }
+  for (let v = 0; v <= H + 1e-6; v += 0.305) { ctx.beginPath(); ctx.moveTo(T.X(0), T.Y(v)); ctx.lineTo(T.X(W), T.Y(v)); ctx.stroke(); }
+}
+function drawGoalFrame(ctx, T) {
+  ctx.strokeStyle = css("--ink"); ctx.lineWidth = 7; ctx.lineJoin = "round";
+  ctx.beginPath(); ctx.moveTo(T.X(0), T.Y(0)); ctx.lineTo(T.X(0), T.Y(H)); ctx.lineTo(T.X(W), T.Y(H)); ctx.lineTo(T.X(W), T.Y(0)); ctx.stroke();
+  ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(T.X(0), T.Y(0)); ctx.lineTo(T.X(0), T.Y(H)); ctx.lineTo(T.X(W), T.Y(H)); ctx.lineTo(T.X(W), T.Y(0)); ctx.stroke();
+}
+function drawKeeper(ctx, T, pos, lean, alpha = 1) {
+  // pos = hands/body centre (u, v); lean in radians, positive = diving right
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.translate(T.X(pos[0]), T.Y(pos[1])); ctx.rotate(lean);
+  const s = T.s; const ink = css("--ink"); const kit = css("--card");
+  ctx.lineCap = "round";
+  ctx.strokeStyle = ink; ctx.lineWidth = 0.2 * s; // legs
+  ctx.beginPath(); ctx.moveTo(-0.08 * s, 0.25 * s); ctx.lineTo(-0.2 * s, 0.98 * s); ctx.moveTo(0.08 * s, 0.25 * s); ctx.lineTo(0.2 * s, 0.98 * s); ctx.stroke();
+  ctx.strokeStyle = kit; ctx.lineWidth = 0.13 * s; // arms up
+  ctx.beginPath(); ctx.moveTo(-0.16 * s, -0.25 * s); ctx.lineTo(-0.42 * s, -0.78 * s); ctx.moveTo(0.16 * s, -0.25 * s); ctx.lineTo(0.42 * s, -0.78 * s); ctx.stroke();
+  ctx.fillStyle = kit; ctx.strokeStyle = ink; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(-0.22 * s, -0.32 * s, 0.44 * s, 0.62 * s, 0.1 * s); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = ink; ctx.beginPath(); ctx.arc(0, -0.48 * s, 0.13 * s, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawMarker(ctx, x, y, outcome, r, emph) {
+  ctx.lineWidth = emph ? 2.5 : 1.6;
+  if (outcome === GOAL) { ctx.fillStyle = css("--goal"); ctx.strokeStyle = css("--surface"); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.stroke(); }
+  else if (outcome === SAVED) { ctx.strokeStyle = css("--saved"); ctx.beginPath(); ctx.arc(x, y, r - 0.5, 0, 7); ctx.stroke(); }
+  else { ctx.strokeStyle = css("--missed"); const k = r * 0.8; ctx.beginPath(); ctx.moveTo(x - k, y - k); ctx.lineTo(x + k, y + k); ctx.moveTo(x + k, y - k); ctx.lineTo(x - k, y + k); ctx.stroke(); }
+}
+function chanceColor(p, a = 0.85) { return hexA(css("--goal"), (0.04 + 0.86 * p) * a); }
+
+/* ------------------------------------------------------------------ simulator state */
+const S = {
+  att: "DQN", keep: "DDPG", pos: "random", speed: 1,
+  lat: 0, dist: 11, history: [], counts: [0, 0, 0],
+  anim: null, busy: false, last: null, aimHover: null,
+};
+const pitchCv = $("#pitch"), goalCv = $("#goalview");
+
+function segInit(id, key, onChange) {
+  const el = document.getElementById(id);
+  const sync = (v) => el.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === String(v))));
+  el.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; onChange(b.dataset.v); sync(b.dataset.v); });
+  return sync;
+}
+const syncAtt = segInit("segAtt", "att", (v) => { S.att = v; clearBoard(); });
+const syncKeep = segInit("segKeep", "keep", (v) => { S.keep = v; clearBoard(); });
+const syncPos = segInit("segPos", "pos", (v) => { S.pos = v; updateHints(); drawAll(); });
+const syncSpeed = segInit("segSpeed", "speed", (v) => { S.speed = parseFloat(v); });
+syncAtt(S.att); syncKeep(S.keep); syncPos(S.pos); syncSpeed(1);
+
+function updateHints() {
+  $("#pitchHint").textContent = S.pos === "fixed" ? "Click or drag inside the box to move the shooter" : "Click inside the box to fix the shooter's spot";
+  const you = S.att === "You";
+  $("#goalHint").textContent = you ? "Click on the goal to aim your shot" : "Ball arrival point and keeper dive";
+  goalCv.classList.toggle("aiming", you);
+  $("#btnShoot").textContent = you ? "Aim on the goal view" : "Take shot";
+  $("#btnShoot").disabled = you; $("#btnRun").disabled = you;
+  const qOk = S.att === "DQN" || S.att === "DDPG";
+  $("#showQ").disabled = !qOk; $("#qLegend").style.opacity = qOk && $("#showQ").checked ? 1 : 0.35;
+  const m = DATA.matrix[S.att]?.[S.keep];
+  $("#refline").textContent = m ? `Over ${DATA.n_eval.toLocaleString()} evaluation shots this matchup scored ${fmt(m.goal_pct)}%, saved ${fmt(m.saved_pct)}%, missed ${fmt(m.missed_pct)}%. Small samples here will wobble around that.`
+    : (S.att === "You" ? "Your shots get the same execution error as the agents: the further and wider you stand, the more the ball drifts from your aim." : "");
+}
+function clearBoard() {
+  S.history = []; S.counts = [0, 0, 0]; S.last = null; S.anim = null; S.busy = false;
+  renderBoard(); updateHints(); drawAll();
+  $("#readout").innerHTML = `<span class="verdict">Ready</span><span>${S.att === "You" ? "Place the shooter on the pitch, then click where you want to shoot." : "Press Take shot to play one penalty, or Run 100 shots for a full session."}</span>`;
+}
+function renderBoard() {
+  const [g, s, m] = S.counts; const n = g + s + m;
+  $("#sGoal").textContent = g; $("#sSaved").textContent = s; $("#sMissed").textContent = m;
+  $("#sRate").textContent = n ? Math.round(100 * g / n) + "%" : "–";
+}
+function zoneLabel(u, v) {
+  const col = u < W / 3 ? "left" : u > 2 * W / 3 ? "right" : "centre";
+  const row = v > H * 0.62 ? "top" : v < H * 0.35 ? "low" : "mid-height";
+  return col === "centre" ? `${row} centre` : `${row} ${col}`;
+}
+
+/* play one shot; returns the shot record */
+function computeShot(aimOverride) {
+  if (S.pos === "random" || S.history.length === 0 && S.pos === "random") { [S.lat, S.dist] = Env.sample(); }
+  const lat = S.lat, dist = S.dist;
+  const aim = aimOverride || Attackers[S.att](lat, dist);
+  const ball = Env.shoot(aim, lat, dist);
+  const keeperFn = Keepers[S.keep];
+  const read = keeperFn ? Env.read(ball) : null;
+  const target = keeperFn ? keeperFn(read, lat, dist) : null;
+  const res = Env.resolve(ball, target, lat, dist);
+  return { lat, dist, aim, ball, read, target, gk: res.gk, outcome: res.outcome, reach: Env.reach(lat, dist), flight: Env.flight(lat, dist) };
+}
+function commit(shot) {
+  S.history.push(shot); if (S.history.length > 400) S.history.shift();
+  S.counts[shot.outcome]++; S.last = shot; renderBoard();
+  const v = ["Goal", "Saved", "Missed"][shot.outcome];
+  const cls = ["goal", "saved", "missed"][shot.outcome];
+  const where = Env.onTarget(shot.ball) ? zoneLabel(shot.ball[0], shot.ball[1]) : (shot.ball[1] > H ? "over the bar" : "wide of the post");
+  const side = Math.abs(shot.lat) < 0.5 ? "straight on" : `${fmt(Math.abs(shot.lat))} m ${shot.lat < 0 ? "left" : "right"} of centre`;
+  let detail = `From ${fmt(shot.dist)} m out, ${side}. Ball arrived ${where} after ${fmt(shot.flight, 2)} s.`;
+  if (shot.gk) {
+    const need = Math.hypot(shot.ball[0] - KS[0], shot.ball[1] - KS[1]) - P.save_radius;
+    detail += shot.outcome === MISSED ? " The keeper could only watch." :
+      ` Keeper could cover ${fmt(shot.reach, 2)} m and needed ${fmt(Math.max(0, need), 2)} m${shot.outcome === GOAL && need <= shot.reach ? ", but dived the wrong way" : ""}.`;
+  } else detail += " Nobody in goal.";
+  $("#readout").innerHTML = `<span class="verdict ${cls}">${v}</span><span>${detail}</span>`;
+  $("#srStatus").textContent = `${v}. ${detail}`;
+}
+
+/* ------------------------------------------------------------------ drawing */
+function drawPitch(now) {
+  const { ctx, w, h } = setupCanvas(pitchCv); const T = pitchXf(w, h);
+  drawPitchBase(ctx, w, h, T);
+  const recent = S.history.slice(-120);
+  for (const s of recent) {
+    if (S.anim && s === S.anim.shot) continue;
+    const c = s.outcome === GOAL ? css("--goal") : s.outcome === SAVED ? css("--saved") : css("--missed");
+    ctx.strokeStyle = hexA(c, 0.5); ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.moveTo(T.X(s.lat), T.Y(s.dist)); ctx.lineTo(T.X(s.ball[0] - W / 2), T.Y(0)); ctx.stroke();
+  }
+  // keeper on the goal line (top-down)
+  let kx = KS[0] - W / 2;
+  let ballPos = null, shooter = [S.lat, S.dist];
+  if (S.anim) {
+    const a = S.anim, t = a.t;
+    const s = a.shot;
+    if (t > a.tKick) {
+      const f = clamp((t - a.tKick) / (a.tArrive - a.tKick), 0, 1);
+      ballPos = [s.lat + (s.ball[0] - W / 2 - s.lat) * f, s.dist * (1 - f)];
+      ctx.strokeStyle = hexA(css("--chalk"), 0.75); ctx.lineWidth = 1.5; ctx.setLineDash([3, 4]);
+      ctx.beginPath(); ctx.moveTo(T.X(s.lat), T.Y(s.dist)); ctx.lineTo(T.X(ballPos[0]), T.Y(ballPos[1])); ctx.stroke(); ctx.setLineDash([]);
+    }
+    if (s.gk) kx = keeperU(a) - W / 2;
+    shooter = [s.lat, s.dist];
+  } else if (S.last && S.last.gk) { kx = S.last.gk[0] - W / 2; }
+  if (S.keep !== "Empty goal") { ctx.fillStyle = css("--card"); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.roundRect(T.X(kx) - 0.55 * T.s, T.Y(0.35), 1.1 * T.s, 0.55 * T.s, 3); ctx.fill(); ctx.stroke(); }
+  // last shot line emphasised
+  if (!S.anim && S.last) {
+    const s = S.last; const c = s.outcome === GOAL ? css("--goal") : s.outcome === SAVED ? css("--saved") : css("--missed");
+    ctx.strokeStyle = c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(T.X(s.lat), T.Y(s.dist)); ctx.lineTo(T.X(s.ball[0] - W / 2), T.Y(0)); ctx.stroke();
+  }
+  // shooter
+  ctx.fillStyle = css("--card"); ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(T.X(shooter[0]), T.Y(shooter[1]), 7, 0, 7); ctx.fill(); ctx.stroke();
+  if (S.pos === "fixed" && !S.anim) { ctx.strokeStyle = hexA(css("--card"), 0.8); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(T.X(shooter[0]), T.Y(shooter[1]), 13, 0, 7); ctx.stroke(); }
+  if (ballPos) { ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(T.X(ballPos[0]), T.Y(ballPos[1]), 4.5, 0, 7); ctx.fill(); ctx.stroke(); }
+}
+function keeperProgress(a) {
+  const tr = a.tKick + P.keeper_reaction * a.slow;
+  return clamp((a.t - tr) / Math.max(1e-3, a.tArrive - tr), 0, 1);
+}
+function keeperU(a) { const s = a.shot; const f = easeOut(keeperProgress(a)); return KS[0] + (s.gk[0] - KS[0]) * f; }
+const easeOut = (x) => 1 - Math.pow(1 - x, 2);
+
+function drawGoal() {
+  const { ctx, w, h } = setupCanvas(goalCv); const T = goalXf(w, h);
+  drawGoalBase(ctx, w, h, T);
+  const lat = S.anim ? S.anim.shot.lat : S.lat, dist = S.anim ? S.anim.shot.dist : S.dist;
+  const showQ = $("#showQ").checked && (S.att === "DQN" || S.att === "DDPG") && (S.pos === "fixed" || S.anim || S.last);
+  if (showQ) {
+    const L = S.anim ? S.anim.shot : (S.pos === "fixed" ? { lat: S.lat, dist: S.dist } : S.last);
+    const g = scoringChanceGrid(S.att, L.lat, L.dist);
+    if (g.kind === "cells") {
+      const du = (g.grid[1][0] - g.grid[0][0]), dv = (g.grid[15][1] - g.grid[0][1]);
+      g.grid.forEach((pt, i) => { ctx.fillStyle = chanceColor(g.p[i]); ctx.fillRect(T.X(pt[0] - du / 2) + 1, T.Y(pt[1] + dv / 2) + 1, du * T.s - 2, dv * T.s - 2); });
+    } else {
+      g.pts.forEach((pt, i) => { ctx.fillStyle = chanceColor(g.p[i]); ctx.fillRect(T.X(pt[0] - g.du / 2), T.Y(pt[1] + g.dv / 2), g.du * T.s + 0.6, g.dv * T.s + 0.6); });
+    }
+  }
+  drawGoalFrame(ctx, T);
+  // history markers
+  for (const s of S.history.slice(-150)) {
+    if (S.anim && s === S.anim.shot) continue; if (s === S.last && !S.anim) continue;
+    ctx.globalAlpha = 0.55; drawMarker(ctx, T.X(s.ball[0]), T.Y(s.ball[1]), s.outcome, 4, false); ctx.globalAlpha = 1;
+  }
+  const kOn = S.keep !== "Empty goal";
+  // keeper reach zone
+  if (kOn && $("#showReach").checked) {
+    const r = Env.reach(lat, dist) + P.save_radius;
+    ctx.fillStyle = hexA(css("--saved"), 0.1); ctx.strokeStyle = hexA(css("--saved"), 0.7); ctx.lineWidth = 1.5; ctx.setLineDash([6, 5]);
+    ctx.save(); ctx.beginPath(); ctx.rect(T.X(0), T.Y(H), W * T.s, H * T.s); ctx.clip();
+    ctx.beginPath(); ctx.arc(T.X(KS[0]), T.Y(KS[1]), r * T.s, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore(); ctx.setLineDash([]);
+  }
+  // keeper
+  if (kOn) {
+    let pos = KS, lean = 0;
+    if (S.anim && S.anim.shot.gk) {
+      const a = S.anim, s = a.shot, f = easeOut(keeperProgress(a));
+      pos = [KS[0] + (s.gk[0] - KS[0]) * f, KS[1] + (s.gk[1] - KS[1]) * f];
+      lean = clamp((s.gk[0] - KS[0]) / 2.4, -1.25, 1.25) * f;
+    } else if (S.last && S.last.gk) { pos = S.last.gk; lean = clamp((pos[0] - KS[0]) / 2.4, -1.25, 1.25); }
+    drawKeeper(ctx, T, pos, lean);
+    if (!S.anim && S.last && S.last.gk) { ctx.strokeStyle = hexA(css("--saved"), 0.9); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(T.X(pos[0]), T.Y(pos[1]), P.save_radius * T.s, 0, 7); ctx.stroke(); }
+  }
+  // aim + ball
+  const aimShot = S.anim ? S.anim.shot : S.last;
+  if (aimShot) {
+    const ax = T.X(aimShot.aim[0]), ay = T.Y(aimShot.aim[1]);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ax - 9, ay); ctx.lineTo(ax - 3, ay); ctx.moveTo(ax + 3, ay); ctx.lineTo(ax + 9, ay); ctx.moveTo(ax, ay - 9); ctx.lineTo(ax, ay - 3); ctx.moveTo(ax, ay + 3); ctx.lineTo(ax, ay + 9); ctx.stroke();
+  }
+  if (S.anim) {
+    const a = S.anim, s = a.shot;
+    if (a.t > a.tKick) {
+      const f = clamp((a.t - a.tKick) / (a.tArrive - a.tKick), 0, 1);
+      const u = W / 2 + (s.ball[0] - W / 2) * f, v = 0.11 + (s.ball[1] - 0.11) * f + Math.sin(Math.PI * f) * 0.0;
+      const r = (0.06 + 0.06 * f * f) * T.s + 2;
+      ctx.fillStyle = "#ffffff"; ctx.strokeStyle = "#111"; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(T.X(u), T.Y(v), r, 0, 7); ctx.fill(); ctx.stroke();
+    }
+  } else if (S.last) {
+    drawMarker(ctx, T.X(S.last.ball[0]), T.Y(S.last.ball[1]), S.last.outcome, 7, true);
+  }
+  if (S.att === "You" && S.aimHover && !S.busy) {
+    const [u, v] = S.aimHover; const [su, sv] = Env.noise(S.lat, S.dist);
+    ctx.strokeStyle = css("--ink"); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.3;
+    ctx.beginPath(); ctx.ellipse(T.X(u), T.Y(v), 2 * su * T.s, 2 * sv * T.s, 0, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = css("--ink"); ctx.beginPath(); ctx.arc(T.X(u), T.Y(v), 3, 0, 7); ctx.fill();
+  }
+}
+function drawAll(now) { drawPitch(now); drawGoal(); }
+
+/* ------------------------------------------------------------------ animation */
+function playShot(aimOverride) {
+  if (S.busy) return;
+  const shot = computeShot(aimOverride);
+  const slow = 3.2 / S.speed;
+  const tKick = 0.35 / S.speed;
+  const a = { shot, slow, t: 0, tKick, tArrive: tKick + shot.flight * slow, tEnd: tKick + shot.flight * slow + 0.25 / S.speed };
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { commit(shot); drawAll(); return; }
+  S.anim = a; S.busy = true;
+  let t0 = null;
+  const step = (ts) => {
+    if (S.anim !== a) return;
+    if (t0 === null) t0 = ts; a.t = (ts - t0) / 1000;
+    if (a.t >= a.tEnd) { S.anim = null; S.busy = false; commit(shot); drawAll(); return; }
+    drawAll(); requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function runMany(n) {
+  if (S.busy) return; S.busy = true; let i = 0; $("#btnRun").disabled = true;
+  const per = Math.max(1, Math.round(4 * S.speed));
+  const tick = () => {
+    if (!S.busy) { $("#btnRun").disabled = S.att === "You"; return; }
+    for (let k = 0; k < per && i < n; k++, i++) commit(computeShot());
+    drawAll();
+    if (i < n) requestAnimationFrame(tick); else { S.busy = false; $("#btnRun").disabled = S.att === "You"; }
+  };
+  requestAnimationFrame(tick);
+}
+$("#btnShoot").addEventListener("click", () => playShot());
+$("#btnRun").addEventListener("click", () => runMany(100));
+$("#btnClear").addEventListener("click", clearBoard);
+$("#showQ").addEventListener("change", () => { updateHints(); drawAll(); });
+$("#showReach").addEventListener("change", () => drawAll());
+
+/* pitch: place shooter */
+let dragging = false;
+function placeShooter(e) {
+  const r = pitchCv.getBoundingClientRect(); const T = pitchXf(r.width, r.height);
+  const [x, y] = T.inv(e.clientX - r.left, e.clientY - r.top);
+  S.lat = clamp(x, P.lat_range[0], P.lat_range[1]); S.dist = clamp(y, P.dist_range[0], P.dist_range[1]);
+  if (S.pos !== "fixed") { S.pos = "fixed"; syncPos("fixed"); updateHints(); }
+  drawAll();
+}
+pitchCv.addEventListener("pointerdown", (e) => { if (S.busy) return; dragging = true; pitchCv.setPointerCapture(e.pointerId); placeShooter(e); });
+pitchCv.addEventListener("pointermove", (e) => { if (dragging && !S.busy) placeShooter(e); });
+pitchCv.addEventListener("pointerup", () => { dragging = false; });
+/* goal view: aim when attacker = You */
+function goalPoint(e) { const r = goalCv.getBoundingClientRect(); const T = goalXf(r.width, r.height); return T.inv(e.clientX - r.left, e.clientY - r.top); }
+goalCv.addEventListener("pointermove", (e) => { if (S.att !== "You") return; const [u, v] = goalPoint(e); S.aimHover = [u, Math.max(0, v)]; if (!S.busy) drawGoal(); });
+goalCv.addEventListener("pointerleave", () => { S.aimHover = null; if (!S.busy) drawGoal(); });
+goalCv.addEventListener("click", (e) => {
+  if (S.att !== "You" || S.busy) return;
+  const [u, v] = goalPoint(e);
+  if (S.pos === "random" && S.history.length) { [S.lat, S.dist] = Env.sample(); }
+  const keepPos = S.pos; S.pos = "fixed"; playShot([u, Math.max(0, v)]); S.pos = keepPos;
+});
+
+/* ------------------------------------------------------------------ rules */
+(function rules() {
+  const at = (lat, dist) => ({ n: Env.noise(lat, dist), r: Env.reach(lat, dist), f: Env.flight(lat, dist) });
+  const a6 = at(0, 6), a11 = at(0, 11), a16 = at(0, 16.5), w11 = at(8, 11);
+  const items = [
+    ["Shot error", `σ = ${P.shot_noise_base} + ${P.shot_noise_per_m} × range`, `The ball lands at the aim point plus random error. It is ±${fmt(a6.n[0], 2)} m from 6 m, ±${fmt(a11.n[0], 2)} m from the spot and ±${fmt(a16.n[0], 2)} m from the edge of the box. Wide angles stretch it sideways: ±${fmt(w11.n[0], 2)} m from 8 m wide at 11 m.`],
+    ["Keeper reach", `(range / ${P.ball_speed} m/s − ${P.keeper_reaction} s) × ${P.keeper_speed} m/s`, `The keeper starts in the middle and moves only after reacting. From the spot the ball takes ${fmt(a11.f, 2)} s, which leaves ${fmt(a11.r, 2)} m of travel. From 6 m it is ${fmt(a6.r, 2)} m, from 16.5 m it is ${fmt(a16.r, 2)} m.`],
+    ["Save", `‖keeper − ball‖ < ${P.save_radius} m`, `A shot is saved if the keeper's hands end up within ${P.save_radius} m of the ball, the thesis' deflection radius. On target means inside the ${W} m × ${H} m frame.`],
+    ["Keeper's read", `read = ball + N(0, ${P.keeper_read_noise} m)`, `The keeper does not get the attacker's exact target. It sees where the ball is heading with ${P.keeper_read_noise} m of error, plus where the shot came from.`],
+    ["Attacker reward", "+10 goal · −10 saved or missed", "The outcome reward from the thesis' combined environment. Each shot is a one-step episode, as in the thesis code."],
+    ["Keeper reward", "+10 save · −10 goal · + distance bonus", "Outcome reward plus the thesis' shaping term for ending close to the ball (0 to 5) and +2 for a clean catch inside 0.5 m. Shots off target give 0."],
+  ];
+  $("#rulesGrid").innerHTML = items.map(([t, f, p]) => `<div class="rule"><h3>${t}</h3><div class="f">${f}</div><p>${p}</p></div>`).join("");
+})();
+
+/* ------------------------------------------------------------------ aim map */
+const M = { att: "DQN", keep: "Heuristic", cache: {} };
+const syncMA = segInit("segMapAtt", "att", (v) => { M.att = v; drawAimMap(); });
+const syncMK = segInit("segMapKeep", "keep", (v) => { M.keep = v; drawAimMap(); });
+syncMA(M.att); syncMK(M.keep);
+const MAP_LATS = [-10, -7.5, -5, -2.5, 0, 2.5, 5, 7.5, 10], MAP_DISTS = [6, 7.5, 9, 10.5, 12, 13.5, 15, 16.5];
+function mapStats(att, keep) {
+  const key = att + "|" + keep; if (M.cache[key]) return M.cache[key];
+  const cells = []; const n = 300; let tot = 0;
+  for (const d of MAP_DISTS) for (const l of MAP_LATS) {
+    const aim = Attackers[att](l, d); let g = 0;
+    for (let k = 0; k < n; k++) { const b = Env.shoot(aim, l, d); const r = Env.resolve(b, Keepers[keep](Env.read(b), l, d), l, d); if (r.outcome === GOAL) g++; }
+    cells.push({ lat: l, dist: d, aim, p: g / n }); tot += g / n;
+  }
+  return (M.cache[key] = { cells, mean: tot / cells.length, n });
+}
+const MAP_VIEW = { x0: -11.6, x1: 11.6, y0: -1.4, y1: 17.6 };
+function drawAimMap() {
+  const cv = $("#aimmap"); const { ctx, w, h } = setupCanvas(cv);
+  const T = pitchXf(w, h, MAP_VIEW);
+  drawPitchBase(ctx, w, h, T);
+  const st = mapStats(M.att, M.keep);
+  const gw = 2.35 * T.s, gh = gw * H / W * 1.45;
+  const algoCol = css(M.att === "DQN" ? "--dqn" : "--ddpg");
+  for (const c of st.cells) {
+    const cx = T.X(c.lat), cy = T.Y(c.dist);
+    const x0 = cx - gw / 2, y0 = cy - gh / 2;
+    ctx.fillStyle = css("--net-bg"); ctx.fillRect(x0, y0, gw, gh);
+    ctx.fillStyle = chanceColor(c.p, 1); ctx.fillRect(x0, y0, gw, gh);
+    ctx.strokeStyle = css("--ink"); ctx.lineWidth = 1.2; ctx.strokeRect(x0, y0, gw, gh);
+    const px = x0 + (c.aim[0] / W) * gw, py = y0 + gh - (c.aim[1] / H) * gh;
+    ctx.fillStyle = algoCol; ctx.strokeStyle = css("--surface"); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(px, py, Math.max(3.5, gw * 0.085), 0, 7); ctx.fill(); ctx.stroke();
+  }
+  $("#mapSummary").textContent = `Average over ${st.cells.length} spots: ${fmt(100 * st.mean)}% scored (${st.n} shots per spot)`;
+  const best = st.cells.reduce((a, b) => (b.p > a.p ? b : a)), worst = st.cells.reduce((a, b) => (b.p < a.p ? b : a));
+  const lefty = st.cells.filter(c => c.aim[0] < W / 2).length;
+  const high = st.cells.filter(c => c.aim[1] > H / 2).length;
+  $("#mapNote").innerHTML = `
+    <p><b>${M.att} attacker vs ${M.keep === "Heuristic" ? "scripted" : M.keep} keeper.</b> It aims at the left half of the goal from ${lefty} of ${st.cells.length} spots and above half height from ${high}.</p>
+    <p>Best spot: ${fmt(best.dist)} m out, ${best.lat === 0 ? "central" : fmt(Math.abs(best.lat)) + " m " + (best.lat < 0 ? "left" : "right")}, ${fmt(100 * best.p, 0)}% scored. Hardest: ${fmt(worst.dist)} m out, ${worst.lat === 0 ? "central" : fmt(Math.abs(worst.lat)) + " m " + (worst.lat < 0 ? "left" : "right")}, ${fmt(100 * worst.p, 0)}%.</p>
+    <p>Close to goal the keeper has almost no time, so nearly any aim inside the frame scores. From the edge of the box the keeper can reach most of the goal and the shot error grows, so the attacker has to pick a corner while leaving margin for error. A DQN can only pick from its ${N.attacker_dqn.grid.length} grid points, which shows up as aims snapping to the same few spots. DDPG's aim moves smoothly with position.</p>`;
+}
+
+/* ------------------------------------------------------------------ charts */
+function lineChart(host, series, opts) {
+  const Wd = 560, Ht = 260, m = { l: 40, r: 74, t: 14, b: 34 };
+  const xmax = opts.xmax, ymax = opts.ymax;
+  const X = (x) => m.l + (x / xmax) * (Wd - m.l - m.r), Y = (y) => Ht - m.b - (y / ymax) * (Ht - m.t - m.b);
+  let svg = `<svg viewBox="0 0 ${Wd} ${Ht}" role="img" aria-label="${opts.label}">`;
+  for (let y = 0; y <= ymax; y += opts.ystep) { svg += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l - 8}" y="${Y(y) + 4}" text-anchor="end">${y}</text>`; }
+  for (let x = 0; x <= xmax; x += opts.xstep) svg += `<text x="${X(x)}" y="${Ht - m.b + 18}" text-anchor="middle">${x.toLocaleString()}</text>`;
+  svg += `<text x="${(m.l + Wd - m.r) / 2}" y="${Ht - 2}" text-anchor="middle">episode (10 shots each)</text>`;
+  series.forEach((s) => {
+    const d = s.x.map((x, i) => `${i ? "L" : "M"}${X(x).toFixed(1)},${Y(s.y[i]).toFixed(1)}`).join("");
+    svg += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
+    const lx = s.x[s.x.length - 1], ly = s.y[s.y.length - 1];
+    svg += `<circle cx="${X(lx)}" cy="${Y(ly)}" r="4" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`;
+  });
+  // direct labels at the end, nudged apart
+  const ends = series.map(s => ({ s, y: Y(s.y[s.y.length - 1]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 16) ends[i].y = ends[i - 1].y + 16;
+  ends.forEach(e => { svg += `<text class="lbl" x="${Wd - m.r + 10}" y="${e.y + 4}" text-anchor="start">${e.s.name} ${fmt(e.s.y[e.s.y.length - 1])}</text>`; });
+  svg += `<line class="xh" x1="0" x2="0" y1="${m.t}" y2="${Ht - m.b}" stroke="var(--ink-3)" stroke-width="1" visibility="hidden"/>`;
+  svg += `<rect x="${m.l}" y="${m.t}" width="${Wd - m.l - m.r}" height="${Ht - m.t - m.b}" fill="transparent" class="hit"/></svg>`;
+  host.innerHTML = svg + `<div class="tip"></div>`;
+  const el = host.querySelector("svg"), tip = host.querySelector(".tip"), xh = host.querySelector(".xh");
+  el.querySelector(".hit").addEventListener("pointermove", (e) => {
+    const r = el.getBoundingClientRect(); const sx = (e.clientX - r.left) * (Wd / r.width);
+    const xv = clamp((sx - m.l) / (Wd - m.l - m.r) * xmax, 0, xmax);
+    const i = series[0].x.reduce((bi, x, k) => (Math.abs(x - xv) < Math.abs(series[0].x[bi] - xv) ? k : bi), 0);
+    const xx = X(series[0].x[i]); xh.setAttribute("x1", xx); xh.setAttribute("x2", xx); xh.setAttribute("visibility", "visible");
+    tip.style.display = "block"; tip.style.left = (xx / Wd * r.width + 8) + "px"; tip.style.top = (m.t / Ht * r.height + 30) + "px";
+    tip.innerHTML = `<b>Episode ${series[0].x[i].toLocaleString()}</b><br>` + series.map(s => `<i style="background:${s.color}"></i>${s.name}: ${fmt(s.y[i], 2)}`).join("<br>");
+  });
+  el.querySelector(".hit").addEventListener("pointerleave", () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); });
+}
+function drawCharts() {
+  const C = DATA.curves.series, ep = DATA.curves.episodes;
+  const mk = (role, key) => [{ name: "DQN", color: css("--dqn"), ...C[`${role}_dqn`][key] }, { name: "DDPG", color: css("--ddpg"), ...C[`${role}_ddpg`][key] }];
+  const ea = ep.attacker_dqn, ek = ep.keeper_dqn;
+  lineChart($("#chartAtt"), mk("attacker", "goals"), { xmax: ea, ymax: 10, ystep: 2, xstep: ea > 5000 ? 2000 : 1000, label: "Attacker goals per 10 shots during training" });
+  lineChart($("#chartKeep"), mk("keeper", "saved"), { xmax: ek, ymax: 10, ystep: 2, xstep: ek > 5000 ? 2000 : 1000, label: "Keeper saves per 10 shots during training" });
+}
+$("#trainLede").textContent = `Attackers trained for ${DATA.curves.episodes.attacker_dqn.toLocaleString()} episodes and keepers for ${DATA.curves.episodes.keeper_dqn.toLocaleString()}, each episode being 10 shots as in the thesis. Lines are ${DATA.curves.window}-episode moving averages. Exploration is on during training and decays over the first 60% of it, so the curves sit below the greedy evaluation in the results table.`;
+
+/* ------------------------------------------------------------------ results tables */
+function cell(r, emph) {
+  const g = r.goal_pct, s = r.saved_pct, m = r.missed_pct;
+  return `<td class="${emph ? "hl" : ""}"><div class="cellbar"><span class="t"><b>${fmt(g)}%</b> <small>scored · ${fmt(s)}% saved · ${fmt(m)}% wide</small></span>
+    <span class="bar"><i style="width:${g}%;background:var(--goal)"></i><i style="width:${s}%;background:var(--saved)"></i><i style="width:${m}%;background:var(--missed)"></i></span></div></td>`;
+}
+(function tables() {
+  const A = ["DQN", "DDPG", "Simplistic"], K = ["Empty goal", "Heuristic", "DQN", "DDPG"];
+  const kName = { "Empty goal": "No keeper", Heuristic: "Scripted keeper", DQN: "DQN keeper", DDPG: "DDPG keeper" };
+  const aName = { DQN: "DQN attacker", DDPG: "DDPG attacker", Simplistic: "Random-aim attacker" };
+  let t = `<thead><tr><th>Attacker ↓ · Keeper →</th>${K.map(k => `<th>${kName[k]}</th>`).join("")}</tr></thead><tbody>`;
+  for (const a of A) t += `<tr><th style="background:transparent;color:var(--ink);font-family:var(--font-body);font-size:14px;text-transform:none;letter-spacing:0">${aName[a]}</th>${K.map(k => cell(DATA.matrix[a][k], a === k)).join("")}</tr>`;
+  $("#matrix").innerHTML = t + "</tbody>";
+  $("#resLede").textContent = `Every attacker against every keeper, ${DATA.n_eval.toLocaleString()} shots per cell from random spots in the box, no exploration. Highlighted cells are the thesis' Chapter 7 matchups: each algorithm against itself.`;
+
+  const M_ = DATA.matrix;
+  const pct = (a, k, f = "goal_pct") => fmt(M_[a][k][f]) + "%";
+  const findings = [
+    ["Attackers learned to beat a keeper", `Against the scripted keeper the DQN attacker scores ${pct("DQN", "Heuristic")} and the DDPG attacker ${pct("DDPG", "Heuristic")}, compared with ${pct("Simplistic", "Heuristic")} for random aim. With no keeper the order flips (DQN ${pct("DQN", "Empty goal")}, DDPG ${pct("DDPG", "Empty goal")}): DDPG aims tighter to the corners and accepts more wide shots, which only pays off when someone is in goal.`],
+    ["DDPG makes the better keeper", `On target shots from the random-aim attacker, the DDPG keeper saves ${pct("Simplistic", "DDPG", "save_pct_on_target")} and the DQN keeper ${pct("Simplistic", "DQN", "save_pct_on_target")}. The scripted keeper, which dives straight at its read of the ball, saves ${pct("Simplistic", "Heuristic", "save_pct_on_target")}.`],
+    ["Placement beats reach", `Against trained attackers every keeper's save rate on target drops to between ${fmt(Math.min(...["DQN", "DDPG"].flatMap(a => ["Heuristic", "DQN", "DDPG"].map(k => M_[a][k].save_pct_on_target))))}% and ${fmt(Math.max(...["DQN", "DDPG"].flatMap(a => ["Heuristic", "DQN", "DDPG"].map(k => M_[a][k].save_pct_on_target))))}%. The attackers aim where a keeper starting in the middle cannot get to in time.`],
+  ];
+  $("#findings").innerHTML = findings.map(([t, p]) => `<div class="finding"><b>${t}</b><p>${p}</p></div>`).join("");
+  const rows = [
+    ["Attacker scoring rate, empty goal", "Ch. 5, Table 5.3", "100%", "100%", `${fmt(M_.DQN["Empty goal"].goal_pct)}%`, `${fmt(M_.DDPG["Empty goal"].goal_pct)}%`],
+    ["Keeper save rate vs random-aim attacker", "Ch. 6, Table 6.1", "63%", "99.9%", `${fmt(M_.Simplistic.DQN.save_pct_on_target)}%`, `${fmt(M_.Simplistic.DDPG.save_pct_on_target)}%`],
+    ["Keeper save rate vs attacker of the same algorithm", "Ch. 7, Table 7.1", "55%", "71%", `${fmt(M_.DQN.DQN.save_pct_on_target)}%`, `${fmt(M_.DDPG.DDPG.save_pct_on_target)}%`],
+  ];
+  $("#compare").innerHTML = `<thead><tr><th>Measure</th><th>Source</th><th>Thesis DQN</th><th>Thesis DDPG</th><th>v2 DQN</th><th>v2 DDPG</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${r[0]}</td><td class="n" style="color:var(--ink-3)">${r[1]}</td>${r.slice(2).map(v => `<td class="n">${v}</td>`).join("")}</tr>`).join("") +
+    `</tbody>`;
+})();
+
+/* ------------------------------------------------------------------ code explorer */
+const CHANGES = [
+  ["Every script runs", "Fixed a syntax error in DDPG_attacker.py and DQN_Simulation.py, the _calculate_reward / calculate_reward name mismatch, the SoccerEnvphase3 / SoccerEnvPhase3 class name, and missing imports in phases 2 and 3. v2 is a package of modules rather than notebook cells.", "all files"],
+  ["DQN picks from discrete actions", "The Q-network now outputs one value per aim point on a 15 × 5 grid and the agent takes the argmax. The loss is on Q(s, a) for the action actually taken. The thesis network output an (x, y) pair directly and regressed only its first output towards the reward.", "dqn.py"],
+  ["Exploration decays", "Epsilon now falls from 1.0 to 0.05. The thesis schedule rose from 0.1 to 1.0, which made late-training and evaluation actions uniformly random inside the goal.", "dqn.py"],
+  ["DDPG actions are scaled to the goal", "The actor's tanh output is mapped onto the real goal coordinates. Before, values in −1..1 were clipped and read as metres, which kept every shot and every keeper position inside a 1 m square at the left post.", "ddpg.py"],
+  ["Terminal transitions", "Each shot ends its episode, so the TD target is the reward. The thesis bootstrapped from a next state identical to the current one.", "dqn.py, ddpg.py"],
+  ["A keeper that has to move", "The keeper starts in the middle and can only travel as far as reaction time and dive speed allow before the ball arrives. It sees a noisy read of the shot, not the attacker's target.", "soccer_env.py"],
+  ["Shots that can miss", "Ball placement gets execution error that grows with distance and angle, so aiming at a corner is a trade-off between beating the keeper and missing the frame.", "soccer_env.py"],
+  ["Shooter position matters", "The attacker state is its real spot in the box, and the shot range sets both the error and the keeper's time. The thesis reward did not depend on the attacker's position.", "soccer_env.py"],
+  ["One environment for everything", "Training, evaluation and the head-to-head simulation share one PenaltyEnv with constants in one place. The save radius was 1.5 m, 1.0 m and 0.5 m in different thesis files and is now 1.0 m everywhere.", "soccer_env.py"],
+  ["Greedy evaluation and a full matrix", "Evaluation turns off exploration and dropout and plays every attacker against every keeper over 5,000 shots, plus figures in the style of thesis Figures 7.1 and 7.3.", "evaluate.py"],
+];
+$("#changes").innerHTML = CHANGES.map(([t, p, w]) => `<div class="change"><b>${t}</b><p>${p}</p><span class="where">${w}</span></div>`).join("");
+(function code() {
+  const list = $("#fileList"); let html = "";
+  for (const grp of SOURCES) { html += `<div class="grp">${grp.group}</div>` + grp.files.map(f => `<button data-g="${grp.group}" data-f="${f.name}">${f.name}</button>`).join(""); }
+  list.innerHTML = html;
+  const show = (g, f) => {
+    const file = SOURCES.find(x => x.group === g).files.find(x => x.name === f);
+    const el = $("#codeView"); el.textContent = file.text; el.removeAttribute("data-highlighted"); el.className = "language-python";
+    if (window.hljs) { try { hljs.highlightElement(el); } catch (e) {} }
+    $("#fileName").textContent = (g.startsWith("v2") ? "v2/" : "") + f;
+    $("#fileMeta").textContent = `${file.text.split("\n").length} lines${file.note ? " · " + file.note : ""}`;
+    list.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.g === g && b.dataset.f === f)));
+  };
+  list.addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) show(b.dataset.g, b.dataset.f); });
+  show(SOURCES[0].group, SOURCES[0].files[0].name);
+})();
+
+/* ------------------------------------------------------------------ theme + resize */
+function paintRamps() {
+  const g = `linear-gradient(90deg, ${chanceColor(0)}, ${chanceColor(0.5)}, ${chanceColor(1)})`;
+  $("#rampSwatch").style.background = g; $("#rampSwatch2").style.background = `linear-gradient(90deg, ${chanceColor(0, 1)}, ${chanceColor(1, 1)})`;
+}
+function redrawEverything() { paintRamps(); drawAll(); drawAimMap(); drawCharts(); }
+let rz; const ro = new ResizeObserver(() => { clearTimeout(rz); rz = setTimeout(() => { if (!S.anim) drawAll(); drawAimMap(); }, 60); });
+[document.body, pitchCv, goalCv].forEach(el => ro.observe(el));
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", redrawEverything);
+new MutationObserver(redrawEverything).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+if (document.fonts) document.fonts.ready.then(() => drawAll());
+
+clearBoard();
+redrawEverything();
+</script>
